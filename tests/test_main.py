@@ -107,19 +107,13 @@ class TestCommandLine(unittest.TestCase):
         fname2 = tempfile.NamedTemporaryFile(
             suffix='.pdf', prefix='test_psyplot_').name
         self._created_files.add(fname2)
-        # create a formatoptions file
-        fmt_file = tempfile.NamedTemporaryFile(
-            suffix='.yml', prefix='test_psyplot_').name
-        self._created_files.add(fmt_file)
-        with open(fmt_file, 'w') as f:
-            yaml.dump({'fmt1': 'fmt1', 'fmt2': 'fmt2'}, f)
         if not six.PY2:
             with self.assertRaisesRegex(ValueError, 'plotting method'):
                 main.main([bt.get_file('test-t2m-u-v.nc'), '-o', fname2,
                            '-d', 'time,1,2', 'y,3,4', '-n', 'u', 'v'])
         main.main([bt.get_file('test-t2m-u-v.nc'), '-o', fname2,
                    '-d', 'time,1,2', 'y,3,4', '-n', 'u', 'v',
-                   '-pm', 'test_plotter', '-fmt', fmt_file])
+                   '-pm', 'test_plotter', '-fmt', "fmt1=fmt1", "fmt2=fmt2"])
         mp = psy.gcp(True)
         self.assertEqual(len(mp), 2*2*2, msg=mp)
         all_dims = set(product((1, 2), (3, 4), ('u', 'v')))
@@ -127,6 +121,28 @@ class TestCommandLine(unittest.TestCase):
             idims = arr.psy.idims
             all_dims -= {(idims['time'], idims['lat'], arr.name)}
         self.assertFalse(all_dims)
+        for i, plotter in enumerate(mp.plotters):
+            self.assertEqual(plotter['fmt1'], 'fmt1',
+                             msg='Wrong value for fmt1 of plotter %i!' % i)
+            self.assertEqual(plotter['fmt2'], 'fmt2',
+                             msg='Wrong value for fmt2 of plotter %i!' % i)
+
+    def test_main_04_preset(self):
+        import yaml
+        psy.register_plotter('test_plotter', module='test_plotter',
+                             plotter_name='TestPlotter')
+        fname2 = tempfile.NamedTemporaryFile(
+            suffix='.pdf', prefix='test_psyplot_').name
+        self._created_files.add(fname2)
+        # create a formatoptions file
+        fmt_file = tempfile.NamedTemporaryFile(
+            suffix='.yml', prefix='test_psyplot_').name
+        self._created_files.add(fmt_file)
+        with open(fmt_file, 'w') as f:
+            yaml.dump({'fmt1': 'fmt1', 'fmt2': 'fmt2'}, f)
+        main.main([bt.get_file('test-t2m-u-v.nc'), '-o', fname2,
+                   '-pm', 'test_plotter', '--preset', fmt_file])
+        mp = psy.gcp(True)
         for i, plotter in enumerate(mp.plotters):
             self.assertEqual(plotter['fmt1'], 'fmt1',
                              msg='Wrong value for fmt1 of plotter %i!' % i)

@@ -138,6 +138,14 @@ def make_plot(fnames=[], name=[], dims=None, plot_method=None,
         import seaborn as sns
         sns.set_style(seaborn_style)
     import psyplot.project as psy
+
+    if formatoptions is not None:
+        if not isinstance(formatoptions, dict):
+            # list of dicts
+            for fmt in formatoptions[1:]:
+                formatoptions[0].update(fmt)
+            formatoptions = formatoptions[0]
+
     if project is not None:
         fnames = [s.split(',') for s in fnames]
         chname = dict(chname)
@@ -208,10 +216,9 @@ def get_parser(create=True):
 
             $ psyplot old_ds.nc,other_ds.nc -p project.pkl -o test.pdf
 
-        You can also load formatoptions from a configuration file, e.g.::
+        You can also directly specify formatoptions, e.g.::
 
-            $ echo 'title: my title' > fmt.yaml
-            $ psyplot myfile.nc -n t2m  -pm mapplot -fmt fmt.yaml -o test.pdf
+            $ psyplot myfile.nc -n t2m  -pm mapplot -fmt 'title=my title' -o test.pdf
         """), 'parser', ['Examples'])
 
     if _on_rtd:  # make a rubric examples section
@@ -279,10 +286,9 @@ def get_parser(create=True):
     parser.update_arg('project', short='p')
 
     parser.update_arg(
-        'formatoptions', short='fmt', type=_load_dict, help="""
-        The path to a yaml (``'.yml'`` or ``'.yaml'``) or pickle file
-        defining a dictionary of formatoption that is applied to the data
-        visualized by the chosen `plot_method`""", metavar='FILENAME')
+        'formatoptions', short='fmt', type=_load_fmt, nargs="+", help="""
+        Formatoptions to apply to the plot. Key and value must be separated by
+        an ``'='`` sign.""", metavar='fmt=value')
 
     parser.update_arg(
         'chname', type=lambda s: s.split(','), nargs='*', help="""
@@ -303,17 +309,25 @@ def get_parser(create=True):
 
     parser.update_arg('concat_dim', short='cd')
 
+    parser.pop_key('preset', 'short')
+
     if create:
         parser.create_arguments()
 
     return parser
 
 
-def _load_dict(fname):
-    with open(fname) as f:
-        if fname.endswith('.yml') or fname.endswith('.yaml'):
-            return yaml.load(f, Loader=yaml.SafeLoader)
-        return pickle.load(f)
+def _load_fmt(fmt_string):
+    try:
+        with open(fmt_string) as f:
+            warn("Passing a configuration file via -fmt is deprecated. "
+                 "Please use --preset instead.", DeprecationWarning())
+            if fmt_string.endswith('.yml') or fmt_string.endswith('.yaml'):
+                return yaml.load(f, Loader=yaml.SafeLoader)
+            return pickle.load(f)
+    except FileNotFoundError:
+        key, val = fmt_string.split('=', 1)
+        return {key: yaml.load(val, yaml.SafeLoader)}
 
 
 def _load_dims(s):
